@@ -1,0 +1,213 @@
+#include <SPI.h>
+#include <Controllino.h>
+
+//Puerta abierta low, cerrada high
+//Palanca en posición High
+//Boton presionado High
+
+
+
+int pinPuerta = CONTROLLINO_A0;
+int pinPalanca = CONTROLLINO_A1;
+int pinBoton = CONTROLLINO_A2;
+int pinSalida1 = CONTROLLINO_D0; //abre
+int pinSalida2 = CONTROLLINO_D1; //cierra
+
+bool puertaAbierta = false;
+bool palancaEnPosicion = false;
+bool botonPresionado = false;
+bool anteriorBotonPresionado = false;
+
+bool salida1Status = false;
+bool salida2Status = false;
+
+
+
+int tiempoDeEspera = 10; //segundos 
+int tiempoSalida1 = 4; //segundos
+int tiempoSalida2 = 4; //segundos máximo 65s
+int tiempoDeEsperaDespuesDeBoton = 4; //segundos
+int anteriorPuerta = false;
+
+long tiempoSalida1Activo = 0;  // 25 dias
+long tiempoSalida2Activo = 0;
+long tiempoPalancaFueraDePosicion = 0;
+long tmpTime = 0;
+
+
+
+
+void setup() {
+  pinMode(CONTROLLINO_A0,INPUT);
+  pinMode(CONTROLLINO_A1,INPUT);
+  pinMode(CONTROLLINO_A2,INPUT);
+
+  pinMode(CONTROLLINO_D0,OUTPUT);
+  pinMode(CONTROLLINO_D1,OUTPUT);
+
+  digitalWrite(pinSalida1,LOW);
+  salida1Status=false;
+  digitalWrite(pinSalida2,LOW);
+  salida2Status=false;
+
+  tiempoSalida1Activo = millis()-(tiempoSalida1*2*1000);
+  tiempoSalida2Activo = millis()-(tiempoSalida2*2*1000);
+  tiempoPalancaFueraDePosicion = millis();
+
+  leerEntradas();
+  
+  if(!botonPresionado){
+      leerEntradas();
+  
+      if(puertaAbierta){
+          digitalWrite(pinSalida1,HIGH);
+          salida1Status=true;
+        for(int x=0; x < int(tiempoSalida1*1000); x++){
+          leerEntradas();
+          delay(1);
+        }
+      }else{
+        digitalWrite(pinSalida2,HIGH);
+          salida2Status=true;
+        for(int x=0; x < int(tiempoSalida2*1000); x++){
+          leerEntradas();
+          delay(1);
+        }
+     }        
+  }else{
+    delay(1);
+  }
+  digitalWrite(pinSalida1,LOW);
+  salida1Status=false;
+  digitalWrite(pinSalida2,LOW);
+  salida2Status=false;
+}
+
+void leerEntradas(){
+  anteriorPuerta = puertaAbierta;
+  if(digitalRead(pinPuerta)==LOW){
+    puertaAbierta = false;
+  }else{
+    puertaAbierta = true;  
+  }
+  if(digitalRead(pinPalanca)==LOW){
+    palancaEnPosicion = true;
+  }else{
+    palancaEnPosicion = false;
+  }
+  if(digitalRead(pinBoton)==HIGH){
+    botonPresionado = true;
+  }else{
+    botonPresionado = false;
+  }
+}
+
+void loop() {
+  leerEntradas();
+  
+
+  if(!botonPresionado){
+
+          if(anteriorBotonPresionado){
+              anteriorBotonPresionado =false;
+              digitalWrite(pinSalida2,LOW);
+              salida2Status=false;
+              digitalWrite(pinSalida1,LOW);
+              salida1Status=false;
+              delay(tiempoDeEsperaDespuesDeBoton*1000);
+          }
+          //=====================================================
+          if( (puertaAbierta) && (puertaAbierta != anteriorPuerta) && (!salida2Status)){
+            tiempoSalida1Activo = millis();
+        
+          }
+
+          //=======================================================
+        
+          if( (!puertaAbierta) && (puertaAbierta != anteriorPuerta) && (!salida1Status)){
+            tiempoSalida2Activo = millis();
+          }
+
+          //=======================================================
+        
+          if(!palancaEnPosicion){
+            
+          }else{
+            tiempoPalancaFueraDePosicion = millis();
+          }
+
+          if(puertaAbierta){
+            tiempoPalancaFueraDePosicion = millis();
+          }
+
+          tmpTime = int((millis() - tiempoPalancaFueraDePosicion)/1000);
+          if(tmpTime > tiempoDeEspera){
+                digitalWrite(pinSalida1,HIGH);
+                digitalWrite(pinSalida2,LOW);
+                salida1Status=true;
+                salida2Status=false;
+                for(int x=0; x < int(tiempoSalida1*1000); x++){
+                  leerEntradas();
+                    delay(1);
+                }
+                digitalWrite(pinSalida2,LOW);
+                digitalWrite(pinSalida1,LOW);
+                salida2Status=false;
+                salida1Status=false;
+
+                while(!palancaEnPosicion){
+                    leerEntradas();
+                    delay(1);
+                }
+                if(!puertaAbierta){
+
+                  digitalWrite(pinSalida2,HIGH);
+                  digitalWrite(pinSalida1,LOW);
+                  salida2Status=true;
+                  salida1Status=false;
+                  for(int x=0; x < int(tiempoSalida2*1000); x++){
+                    leerEntradas();
+                      delay(1);
+                  }
+                }
+
+                digitalWrite(pinSalida2,LOW);
+                digitalWrite(pinSalida1,LOW);
+                salida2Status=false;
+                salida1Status=false;
+                
+          }else{
+
+                //Puerta Abierta
+                 tmpTime = int((millis() - tiempoSalida1Activo)/1000);
+                if(tmpTime < tiempoSalida1){
+                  digitalWrite(pinSalida1,HIGH);
+                  salida1Status=true;
+                }else{
+                  digitalWrite(pinSalida1,LOW);
+                  salida1Status=false;
+                }
+
+               //Puerta Cerrada
+             
+                tmpTime = int((millis() - tiempoSalida2Activo)/1000);
+                if(tmpTime < tiempoSalida2){
+                  digitalWrite(pinSalida2,HIGH);
+                  salida2Status=true;
+                }else{
+                   digitalWrite(pinSalida2,LOW);
+                   salida2Status=false;
+                }
+            
+          }
+  }else{
+      digitalWrite(pinSalida2,HIGH);
+      salida2Status=true;
+      digitalWrite(pinSalida1,LOW);
+      salida1Status=false;
+
+      anteriorBotonPresionado = true;
+      
+  }
+  delay(1);
+}
